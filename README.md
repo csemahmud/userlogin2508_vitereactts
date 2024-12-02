@@ -1,8 +1,7 @@
-# gym-typescript
+# khangym_vitereactts_v2
 
-Build a Complete Typescript React Fitness Application for Beginners
+Build a Complete Typescript React Fitness Application for Beginners.
+It is a sub-repository. Main repository is here:
+https://github.com/csemahmud/ubuntu_practice
 
-Video: https://www.youtube.com/watch?v=I2NNxr3WPDo
 
-For all related questions and discussions about this project, check out the discord:
-https://discord.gg/2FfPeEk2mX
