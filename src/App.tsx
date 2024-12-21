@@ -6,6 +6,7 @@ import ContactUs from "@/components/scenes/contactUs";
 import Footer from "@/components/scenes/footer";
 import { useEffect, useState } from "react";
 import { SelectedPage } from "@/shared/types/enums/SelectedPage.type";
+import ManageUsers from "./components/scenes/manageUsers";
 
 function App() {
   const [selectedPage, setSelectedPage] = useState<SelectedPage>(
@@ -36,6 +37,7 @@ function App() {
       <Benefits setSelectedPage={setSelectedPage} />
       <OurClasses setSelectedPage={setSelectedPage} />
       <ContactUs setSelectedPage={setSelectedPage} />
+      <ManageUsers setSelectedPage={setSelectedPage} />
       <Footer />
     </div>
   );

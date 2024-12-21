@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: [{ find: "@", replacement: path.resolve(__dirname, "src") }],
   },
+  assetsInclude: ['**/*.xlsx'], // Add this line to include `.xlsx` files as assets
 
   server: {
     port: 3009

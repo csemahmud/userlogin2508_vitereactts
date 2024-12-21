@@ -13,6 +13,14 @@ module.exports = {
         "primary-500": "#FF6B66",
         "secondary-400": "#FFCD5B",
         "secondary-500": "#FFC132",
+        magenta: {
+          500: '#FF00FF', // Define magenta color
+        },
+        cyan: {
+          500: '#00FFFF', // Bright cyan
+          600: '#00E5E5', // Slightly darker cyan
+          700: '#00CCCC', // Even darker cyan
+        },
       },
       backgroundImage: (theme) => ({
         "gradient-yellowred":
