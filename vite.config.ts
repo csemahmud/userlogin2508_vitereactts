@@ -11,6 +11,6 @@ export default defineConfig({
   assetsInclude: ['**/*.xlsx'], // Add this line to include `.xlsx` files as assets
 
   server: {
-    port: 3009
+    port: 3010
   }
 });

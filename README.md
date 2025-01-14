@@ -1,4 +1,4 @@
-# usercrud2412_vitereactts
+# webgl_vitereactts
 
 Build a Complete Typescript React Fitness Application for Beginners.
 It is a sub-repository. Main repository is here:
