@@ -32,7 +32,7 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/three": "^0.172.0",
     "@types/xlsx": "^0.0.36",
-    "@vitejs/plugin-react": "^3.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.13",
     "postcss": "^8.4.20",
     "prettier": "^2.8.1",
