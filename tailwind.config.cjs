@@ -37,6 +37,10 @@ module.exports = {
         sparkles: "url('./assets/Sparkles.png')",
         circles: "url('./assets/Circles.png')",
       },
+      zIndex: {
+        '1000': '1000', // Adds z-1000 class
+        '2000': '2000', // Optionally add higher values
+      },
     },
     screens: {
       xs: "480px",

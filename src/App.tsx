@@ -7,6 +7,7 @@ import Footer from "@/components/scenes/footer";
 import { useEffect, useState } from "react";
 import { SelectedPage } from "@/shared/types/enums/SelectedPage.type";
 import ManageUsers from "./components/scenes/manageUsers";
+import WebGL from "./components/scenes/webGL";
 
 function App() {
   const [selectedPage, setSelectedPage] = useState<SelectedPage>(
@@ -38,6 +39,7 @@ function App() {
       <OurClasses setSelectedPage={setSelectedPage} />
       <ContactUs setSelectedPage={setSelectedPage} />
       <ManageUsers setSelectedPage={setSelectedPage} />
+      <WebGL setSelectedPage={setSelectedPage} />
       <Footer />
     </div>
   );
