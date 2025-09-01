@@ -1,11 +1,16 @@
-export interface IUser {
+import { ICategory } from './ICategory.type';
 
+export interface IUser {
     id?: number;
     name: string;
     email: string;
-    domain: string;
-    age: number;
-    experience: number;
-    salary: number;
-    
+    hashedPassword?: string; // stored password (optional on frontend)
+    rawPassword?: string;    // input password (optional)
+    category: ICategory;     // reference to category
+    domain?: string;
+    age?: number;
+    experience?: number;
+    salary?: number;
+    imagePath?: string;
+    imageName?: string;
 }
