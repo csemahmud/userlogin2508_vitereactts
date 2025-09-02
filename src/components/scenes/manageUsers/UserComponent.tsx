@@ -145,6 +145,7 @@ const UserComponent = () => {
                                 onEdit={() => {}}
                                 onDelete={() => {}}
                                 onAdd={() => {}}
+                                setMessage={setMessage}
                             />
                             {errors.category && <p className="text-red-500 text-sm">{errors.category}</p>}
                         </div>
