@@ -13,36 +13,35 @@ const ListUserComponent = () => {
   const [errors, setErrors] = useState({ email: '' });
   const navigate = useNavigate();
 
-  // Load all users initially
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  // Load users when category changes
+  // Fetch users whenever category changes
   useEffect(() => {
     if (categoryId === null) {
       fetchUsers();
     } else {
-      getUsersByCategoryId(categoryId)
-        .then(res => setUsers(res.data))
-        .catch(err => console.error(err));
+      fetchUsersByCategory(categoryId);
     }
   }, [categoryId]);
 
   const fetchUsers = () => {
     listUsers()
-      .then(res => setUsers(res.data))
+      .then(res => setUsers(res.data || []))
+      .catch(err => console.error(err));
+  };
+
+  const fetchUsersByCategory = (id: number) => {
+    getUsersByCategoryId(id)
+      .then(res => setUsers(res.data || []))
       .catch(err => console.error(err));
   };
 
   const handleAddUser = () => navigate('/add-user');
 
   const handleEditUser = (user: IUser) => {
-    if (user.id) navigate(`/edit-user/${user.id}`);
+    if (user.id !== undefined && user.id !== null) navigate(`/edit-user/${user.id}`);
   };
 
   const handleDeleteUser = (user: IUser) => {
-    if (!user.id) return;
+    if (user.id === undefined || user.id === null) return;
 
     const confirmed = confirm(
       `Are you sure you want to DELETE the following user?\n${JSON.stringify(user, null, 2)}`
@@ -51,8 +50,17 @@ const ListUserComponent = () => {
 
     deleteUser(user.id)
       .then(res => {
-        setMessage(res.data.message || res.data.error || '');
-        fetchUsers();
+        let msg = '';
+        if (typeof res.data === 'string') {
+          msg = res.data;
+        } else if (res.data && typeof res.data === 'object') {
+          msg = res.data.message ?? res.data.error ?? '';
+        }
+
+        setMessage(msg);
+        // refetch users for the current category
+        if (categoryId === null) fetchUsers();
+        else fetchUsersByCategory(categoryId);
         setEmail('');
       })
       .catch(err => console.error(err));
@@ -86,14 +94,12 @@ const ListUserComponent = () => {
     getUserByEmail(email.trim())
       .then(res => {
         const data = res.data;
-
-        // If data is a user object, wrap in array
         if (data && typeof data === 'object' && 'name' in data) {
           setUsers([data as IUser]);
           setMessage('');
-        } else if (typeof data === 'string') {
-          setMessage(data);
+        } else {
           setUsers([]);
+          setMessage(typeof data === 'string' ? data : 'No user found.');
         }
       })
       .catch(err => console.error(err));
@@ -120,7 +126,15 @@ const ListUserComponent = () => {
           <MagnifyingGlassIcon className="h-6 w-6 text-cyan-500" />
         </button>
 
-        <CategoryDropdown categoryId={categoryId} setCategoryId={setCategoryId} setMessage={setMessage} variant="list" />
+        <CategoryDropdown
+          categoryId={categoryId}
+          setCategoryId={setCategoryId}
+          setMessage={setMessage}
+          variant="list"
+          onSaved={() => {
+            // no need to fetch users here, categoryId effect handles it
+          }}
+        />
       </div>
 
       {errors.email && <p className="text-red-600 text-sm">{errors.email}</p>}
@@ -152,7 +166,7 @@ const ListUserComponent = () => {
         </thead>
         <tbody>
           {users.map((user, index) => (
-            <tr key={user.id || index} className="hover:bg-gray-100">
+            <tr key={user.id ?? index} className="hover:bg-gray-100">
               <td className="border border-gray-300 px-2 py-1">{index}</td>
               <td className="border border-gray-300 px-2 py-1">{user.id}</td>
               <td className="border border-gray-300 px-2 py-1">{user.name}</td>

@@ -1,48 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import { ICategory } from '@/shared/types/interfaces/models/ICategory.type';
-import { listCategories } from '@/shared/services/CategoryService';
+import { deleteCategory, listCategories } from '@/shared/services/CategoryService';
 import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/solid';
 import CategoryComponent from './CategoryComponent';
+import Swal from 'sweetalert2';
 
 interface CategoryDropdownProps {
   categoryId: number | null;
   setCategoryId: React.Dispatch<React.SetStateAction<number | null>>;
-  onEdit?: (category: ICategory) => void;
-  onDelete?: (category: ICategory) => void;
-  onAdd?: () => void;
   setMessage?: (msg: string) => void;
   variant?: 'default' | 'list';
+  onSaved?: (category: ICategory) => void; // called after adding/editing a category
 }
 
 const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
   categoryId,
   setCategoryId,
-  onEdit,
-  onDelete,
-  onAdd,
-  setMessage = (message) => { console.log(message); },
-  variant = 'default'
+  setMessage = console.log,
+  variant = 'default',
+  onSaved,
 }) => {
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-
-  // Modal states
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryIdToEdit, setCategoryIdToEdit] = useState<number | null>(null);
 
+  // Fetch categories from API
   const fetchCategories = async () => {
     try {
       const response = await listCategories();
       const data = response.data;
-      if (data && Array.isArray(data) && data.length > 0 && 'name' in data[0]) {
+
+      if (Array.isArray(data) && data.length > 0 && 'name' in data[0]) {
         setCategories(data as ICategory[]);
         setMessage('');
       } else if (typeof data === 'string') {
+        setCategories([]);
         setMessage(data);
+      } else {
         setCategories([]);
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error);
+      setMessage('Failed to fetch categories');
+      setCategories([]);
     }
   };
 
@@ -50,51 +51,121 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
     fetchCategories();
   }, []);
 
-  const toggleDropdown = () => setIsOpen(!isOpen);
-  const toggleCategoryModal = () => setIsCategoryModalOpen(!isCategoryModalOpen);
+  const toggleDropdown = () => setIsOpen(prev => !prev);
+  const toggleCategoryModal = () => setIsCategoryModalOpen(prev => !prev);
 
   const displayedCategories =
     variant === 'list'
       ? [{ id: 0, name: 'All Categories', description: '' }, ...categories]
       : categories;
 
+  // Open modal to add a new category
   const handleAddCategory = () => {
-    setCategoryIdToEdit(null); // create
-    setIsOpen(false);          // close dropdown
+    setCategoryIdToEdit(null);
+    setIsOpen(false);
     setIsCategoryModalOpen(true);
   };
 
+  // Open modal to edit existing category
   const handleEditCategory = (category: ICategory) => {
-    setCategoryIdToEdit(category.id ? category.id : null); // edit
-    setIsOpen(false);                 // close dropdown
+    setCategoryIdToEdit(category.id ?? null);
+    setIsOpen(false);
     setIsCategoryModalOpen(true);
   };
 
+  // Called after a category is created/updated
   const handleCategorySaved = (savedCategory: ICategory) => {
-    // Refresh category list automatically
-    fetchCategories();
-
-    // Optionally select the saved category
-    setCategoryId(savedCategory.id ? savedCategory.id : null);
+    fetchCategories(); // refresh list
+    if (savedCategory.id !== undefined && savedCategory.id !== null) {
+      setCategoryId(savedCategory.id); // notify parent safely
+    }
+    onSaved?.(savedCategory); // callback for parent
   };
+
+  // Display label on button
+  const getCategoryLabel = (catId: number | null) => {
+    if (variant === 'list' && (catId === 0 || catId === null)) return 'All Categories';
+    return categories.find(cat => cat.id === catId)?.name || 'Select a Category';
+  };
+
+  // Handle user selecting a category from dropdown
+  const handleSelectCategory = (id: number | undefined) => {
+    const selectedId = id ?? 0;
+    const newValue = variant === 'list' ? (selectedId !== 0 ? selectedId : null) : selectedId;
+    setCategoryId(newValue);
+    setIsOpen(false);
+  };
+
+  const handleDeleteCategory = async (category: ICategory) => {
+      if (category.id === undefined || category.id === null) return;
+
+      const title = 'Confirm Delete :';
+      const text = `Are you sure you want to DELETE the following category?\n${JSON.stringify(category, null, 2)}`;
+      const confirmText = 'Delete';
+      const result = await Swal.fire({
+        title,
+        text,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: confirmText,
+        cancelButtonText: 'Cancel',
+        background: '#1f2937',
+        color: '#f3f4f6',
+        customClass: {
+          confirmButton: 'px-4 py-2 bg-red-600 text-white rounded',
+          cancelButton: 'px-4 py-2 bg-blue-600 text-white rounded',
+        },
+      });
+      if(!result.isConfirmed) return;
+  
+      deleteCategory(category.id)
+      .then(async res => {
+        let msg = '';
+        if (typeof res.data === 'string') {
+          msg = res.data;
+        } else if (res.data && typeof res.data === 'object') {
+          msg = res.data.message ?? res.data.error ?? '';
+        }
+
+        setMessage(msg);
+        await Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'info',
+          title: msg,
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+          background: '#1f2937',
+          color: '#f3f4f6',
+        });
+        fetchCategories();
+      })
+      .catch(async err => {
+        const msg = err.response?.data?.error ?? 'Unexpected error';
+        setMessage(msg);
+        await Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'error',
+          title: msg,
+          showConfirmButton: false,
+          timer: 2000,
+          background: '#1f2937',
+          color: '#f3f4f6',
+        });
+      });
+    };
 
   return (
     <div className="relative w-64">
+      {/* Dropdown Button */}
       <button
         onClick={toggleDropdown}
         className="w-full px-4 py-2 border border-gray-300 rounded flex justify-between items-center bg-white"
       >
-        {variant === 'list'
-          ? categoryId === 0 || categoryId === null
-            ? 'All Categories'
-            : categories.find(cat => cat.id === categoryId)?.name || 'Select a Category'
-          : categories.find(cat => cat.id === categoryId)?.name || 'Select a Category'}
-        <svg
-          className="w-4 h-4 ml-2"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        {getCategoryLabel(categoryId)}
+        <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -104,33 +175,40 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
         </svg>
       </button>
 
+      {/* Dropdown List */}
       {isOpen && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-auto">
           {displayedCategories.map(category => (
             <div
               key={category.id}
               className={`flex justify-between items-center px-4 py-2 cursor-pointer hover:bg-gray-100 ${
-                variant === 'list' && category.id === (categoryId ?? 0)
-                  ? 'bg-blue-100 font-semibold'
-                  : ''
+                variant === 'list' && category.id === (categoryId ?? 0) ? 'bg-blue-100 font-semibold' : ''
               }`}
-              onClick={() => {
-                const id = category.id ?? 0;
-                setCategoryId(variant === 'list' ? (id !== 0 ? id : null) : id);
-                setIsOpen(false);
-              }}
+              onClick={() => handleSelectCategory(category.id)}
             >
               <span>{category.name}</span>
+
               {category.id !== 0 && (
                 <div className="flex gap-2">
+                  {/* Edit */}
                   <button
-                    onClick={e => { e.stopPropagation(); handleEditCategory(category); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleEditCategory(category);
+                    }}
                     title="Edit"
                   >
                     <PencilIcon className="h-5 w-5 text-yellow-500" />
                   </button>
+
+                  {/* Delete */}
                   <button
-                    onClick={e => { e.stopPropagation(); onDelete?.(category); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      // Reset selection if the deleted category was selected
+                      if (categoryId === category.id) setCategoryId(null);
+                      handleDeleteCategory(category);
+                    }}
                     title="Delete"
                   >
                     <TrashIcon className="h-5 w-5 text-red-500" />
@@ -140,6 +218,7 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
             </div>
           ))}
 
+          {/* Add New Category */}
           <div
             className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer border-t border-gray-200"
             onClick={handleAddCategory}
