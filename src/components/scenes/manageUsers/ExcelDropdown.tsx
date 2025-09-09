@@ -55,9 +55,6 @@ const ExcelDropdown: React.FC<ExcelDropdownProps> = ({ domain, setDomain }) => {
           </option>
         ))}
       </select>
-
-      {/* Display the selected domain */}
-      <p>Selected Domain: {domain}</p>
     </div>
   );
 };

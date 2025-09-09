@@ -5,26 +5,94 @@ import ExcelDropdown from './ExcelDropdown';
 import CategoryDropdown from './CategoryDropdown';
 import type { IUser } from '@/shared/types/interfaces/models/IUser.type';
 import type { ICategory } from '@/shared/types/interfaces/models/ICategory.type';
+import Swal from 'sweetalert2';
 
+// -----------------------------
+// Helper Components
+// -----------------------------
+const TextInput = ({
+  label,
+  value,
+  setter,
+  type = 'text',
+  error,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  setter: (v: string) => void;
+  type?: string;
+  error?: string;
+  placeholder?: string;
+}) => (
+  <div>
+    <label className="block text-gray-700 font-medium">{label}:</label>
+    <input
+      type={type}
+      value={value}
+      onChange={e => setter(e.target.value)}
+      placeholder={placeholder}
+      className={`w-full px-4 py-2 border rounded ${error ? 'border-red-500' : 'border-gray-300'}`}
+    />
+    {error && <p className="text-red-500 text-sm">{error}</p>}
+  </div>
+);
+
+const NumberInput = ({
+  label,
+  value,
+  setter,
+  step = 1,
+}: {
+  label: string;
+  value: number | undefined;
+  setter: (v: number | undefined) => void;
+  step?: number;
+}) => (
+  <div>
+    <label className="block text-gray-700 font-medium">{label}:</label>
+    <input
+      type="number"
+      step={step}
+      value={value ?? ''}
+      onChange={e => setter(e.target.value ? Number(e.target.value) : undefined)}
+      className="w-full px-4 py-2 border rounded"
+    />
+  </div>
+);
+
+// -----------------------------
+// Main Component
+// -----------------------------
 const UserComponent = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [rawPassword, setRawPassword] = useState('');
-  const [domain, setDomain] = useState('');
-  const [age, setAge] = useState<number | undefined>();
-  const [experience, setExperience] = useState<number | undefined>();
-  const [salary, setSalary] = useState<number | undefined>();
-  const [categoryId, setCategoryId] = useState<number>(0); // always non-null
-  const [imagePath, setImagePath] = useState('');
-  const [imageName, setImageName] = useState('');
-  const [message, setMessage] = useState('');
-  const [errors, setErrors] = useState({ name: '', email: '', rawPassword: '', category: '' });
-
   const navigate = useNavigate();
   const { id } = useParams();
 
   // -----------------------------
-  // Form Validation
+  // State
+  // -----------------------------
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [rawPassword, setRawPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [domain, setDomain] = useState('');
+  const [age, setAge] = useState<number | undefined>();
+  const [experience, setExperience] = useState<number | undefined>();
+  const [salary, setSalary] = useState<number | undefined>();
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [imagePath, setImagePath] = useState('');
+  const [imageName, setImageName] = useState('');
+  const [message, setMessage] = useState('');
+  const [errors, setErrors] = useState({
+    name: '',
+    email: '',
+    rawPassword: '',
+    confirmPassword: '',
+    category: '',
+  });
+
+  // -----------------------------
+  // Validation
   // -----------------------------
   const validateForm = (): boolean => {
     const newErrors = { ...errors };
@@ -39,11 +107,21 @@ const UserComponent = () => {
       newErrors.email = 'Email is required.';
       valid = false;
     } else if (!/^[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}$/.test(email)) {
-      newErrors.email = 'Invalid Email Format!';
+      newErrors.email = 'Invalid email format.';
       valid = false;
     } else newErrors.email = '';
 
-    if (categoryId <= 0) {
+    if (!rawPassword.trim()) {
+      newErrors.rawPassword = 'Password is required.';
+      valid = false;
+    } else newErrors.rawPassword = '';
+
+    if (rawPassword !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match.';
+      valid = false;
+    } else newErrors.confirmPassword = '';
+
+    if (!categoryId || categoryId <= 0) {
       newErrors.category = 'Category is required.';
       valid = false;
     } else newErrors.category = '';
@@ -53,9 +131,32 @@ const UserComponent = () => {
   };
 
   // -----------------------------
-  // Create or Update User
+  // Load User Data
   // -----------------------------
-  const createOrUpdateUser = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!id) return;
+    getUserById(Number(id))
+      .then(res => {
+        const user = res.data as IUser;
+        if (user?.name) {
+          setName(user.name);
+          setEmail(user.email);
+          setDomain(user.domain || '');
+          setAge(user.age);
+          setExperience(user.experience);
+          setSalary(user.salary);
+          setCategoryId(user.category?.id ?? null);
+          setImagePath(user.imagePath || '');
+          setImageName(user.imageName || '');
+        } else setMessage(res.data as string);
+      })
+      .catch(() => setMessage('Unexpected error occurred'));
+  }, [id]);
+
+  // -----------------------------
+  // Submit Handler
+  // -----------------------------
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
@@ -68,68 +169,54 @@ const UserComponent = () => {
       age,
       experience,
       salary,
-      category: { id: categoryId } as ICategory,
+      category: { id: categoryId! } as ICategory,
+      categoryId: categoryId!,
       imagePath,
       imageName,
     };
 
-    const action = id ? updateUser(Number(id), user) : createUser(user);
+    try {
+      const response = id ? await updateUser(Number(id), user) : await createUser(user);
+      const data = response.data;
 
-    action
-      .then(res => {
-        const data = res.data;
-        if (typeof data === 'string') setMessage(data);
-        else if ('name' in data) setMessage(`User ${id ? 'updated' : 'created'} successfully`);
-        else if ('error' in (data as any)) setMessage((data as any).error);
-      })
-      .catch(() => setMessage('Unexpected error occurred'));
+      const msg =
+        typeof data === 'string'
+          ? data
+          : 'error' in data && typeof data.error === 'string'
+          ? data.error
+          : `User ${id ? 'updated' : 'created'} successfully`;
+
+      setMessage(msg);
+      await Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: msg,
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        background: '#1f2937',
+        color: '#f3f4f6',
+      });
+    } catch (err: any) {
+      const msg = err.response?.data?.error ?? 'Unexpected error occurred';
+      setMessage(msg);
+      await Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'error',
+        title: msg,
+        showConfirmButton: false,
+        timer: 2000,
+        background: '#1f2937',
+        color: '#f3f4f6',
+      });
+    }
   };
 
   // -----------------------------
-  // Load User if Editing
+  // Navigation Helpers
   // -----------------------------
-  useEffect(() => {
-    if (!id) return;
-
-    getUserById(Number(id))
-      .then(res => {
-        const user = res.data as IUser;
-        if (user && typeof user === 'object' && 'name' in user) {
-          setName(user.name);
-          setEmail(user.email);
-          setDomain(user.domain || '');
-          setAge(user.age);
-          setExperience(user.experience);
-          setSalary(user.salary);
-          setCategoryId(user.category?.id ?? 0);
-          setImagePath(user.imagePath || '');
-          setImageName(user.imageName || '');
-        } else {
-          setMessage(res.data as string);
-        }
-      })
-      .catch(() => setMessage('Unexpected error occurred'));
-  }, [id]);
-
-  // -----------------------------
-  // Helpers
-  // -----------------------------
-  const renderNumberInput = (
-    label: string,
-    value: number | undefined,
-    setter: (v: number | undefined) => void
-  ) => (
-    <div>
-      <label className="block text-gray-700 font-medium">{label}:</label>
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={e => setter(e.target.value ? Number(e.target.value) : undefined)}
-        className="w-full px-4 py-2 border rounded"
-      />
-    </div>
-  );
-
   const viewUserList = () => navigate('/users');
   const getOperation = () => (id ? 'Update' : 'Register');
 
@@ -142,44 +229,12 @@ const UserComponent = () => {
       <div className="max-w-3xl mx-auto">
         <div className="bg-white shadow-md rounded p-6">
           <h2 className="text-center text-2xl font-bold mb-4">{getOperation()} User</h2>
-          <form onSubmit={createOrUpdateUser} className="space-y-4">
-            {/* Name */}
-            <div>
-              <label className="block text-gray-700 font-medium">Name:</label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className={`w-full px-4 py-2 border rounded ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <TextInput label="Name" value={name} setter={setName} error={errors.name} />
+            <TextInput label="Email" value={email} setter={setEmail} type="email" error={errors.email} />
+            <TextInput label="Password" value={rawPassword} setter={setRawPassword} type="password" error={errors.rawPassword} placeholder="Enter Password" />
+            <TextInput label="Confirm Password" value={confirmPassword} setter={setConfirmPassword} type="password" error={errors.confirmPassword} placeholder="Confirm Password" />
 
-            {/* Email */}
-            <div>
-              <label className="block text-gray-700 font-medium">Email:</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className={`w-full px-4 py-2 border rounded ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-gray-700 font-medium">Password:</label>
-              <input
-                type="password"
-                value={rawPassword}
-                onChange={e => setRawPassword(e.target.value)}
-                className="w-full px-4 py-2 border rounded"
-                placeholder="Enter Password"
-              />
-            </div>
-
-            {/* Category */}
             <div>
               <label className="block text-gray-700 font-medium">Category:</label>
               <CategoryDropdown
@@ -187,60 +242,31 @@ const UserComponent = () => {
                 setCategoryId={setCategoryId as React.Dispatch<React.SetStateAction<number | null>>}
                 setMessage={setMessage}
                 onSaved={newCategory => {
-                  if (newCategory.id !== undefined) {
-                    setCategoryId(newCategory.id); // assign immediately
-                    setErrors(prev => ({ ...prev, category: '' })); // clear error
-                  }
+                  if (newCategory.id) setCategoryId(newCategory.id);
+                  setErrors(prev => ({ ...prev, category: '' }));
                 }}
               />
               {errors.category && <p className="text-red-500 text-sm">{errors.category}</p>}
+              <p>Selected Category Id: {categoryId}</p>
             </div>
 
-            {/* Domain */}
             <div>
               <label className="block text-gray-700 font-medium">Domain:</label>
               <ExcelDropdown domain={domain} setDomain={setDomain} />
+              <p>Selected Domain: {domain}</p>
             </div>
 
-            {/* Age, Experience, Salary */}
             <div className="grid grid-cols-3 gap-4">
-              {renderNumberInput('Age', age, setAge)}
-              {renderNumberInput('Experience', experience, setExperience)}
-              <div>
-                <label className="block text-gray-700 font-medium">Salary:</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={salary ?? ''}
-                  onChange={e => setSalary(e.target.value ? parseFloat(e.target.value) : undefined)}
-                  className="w-full px-4 py-2 border rounded"
-                />
-              </div>
+              <NumberInput label="Age" value={age} setter={setAge} />
+              <NumberInput label="Experience" value={experience} setter={setExperience} />
+              <NumberInput label="Salary" value={salary} setter={setSalary} step={0.01} />
             </div>
 
-            {/* Image */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-700 font-medium">Image Path:</label>
-                <input
-                  type="text"
-                  value={imagePath}
-                  onChange={e => setImagePath(e.target.value)}
-                  className="w-full px-4 py-2 border rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 font-medium">Image Name:</label>
-                <input
-                  type="text"
-                  value={imageName}
-                  onChange={e => setImageName(e.target.value)}
-                  className="w-full px-4 py-2 border rounded"
-                />
-              </div>
+              <TextInput label="Image Path" value={imagePath} setter={setImagePath} />
+              <TextInput label="Image Name" value={imageName} setter={setImageName} />
             </div>
 
-            {/* Buttons */}
             <div className="flex justify-between items-center mt-4">
               <button type="button" onClick={viewUserList} className="bg-blue-500 text-white px-4 py-2 rounded">
                 View User List

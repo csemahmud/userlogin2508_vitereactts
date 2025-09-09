@@ -7,6 +7,7 @@ export interface IUser {
     hashedPassword?: string; // stored password (optional on frontend)
     rawPassword?: string;    // input password (optional)
     category: ICategory;     // reference to category
+    categoryId?: number;     // reference to categoryId
     domain?: string;
     age?: number;
     experience?: number;

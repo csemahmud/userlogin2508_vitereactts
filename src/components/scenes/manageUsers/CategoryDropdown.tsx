@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ICategory } from '@/shared/types/interfaces/models/ICategory.type';
 import { deleteCategory, listCategories } from '@/shared/services/CategoryService';
 import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/solid';
@@ -10,7 +10,7 @@ interface CategoryDropdownProps {
   setCategoryId: React.Dispatch<React.SetStateAction<number | null>>;
   setMessage?: (msg: string) => void;
   variant?: 'default' | 'list';
-  onSaved?: (category: ICategory) => void; // called after adding/editing a category
+  onSaved?: (category: ICategory) => void;
 }
 
 const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
@@ -24,6 +24,8 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryIdToEdit, setCategoryIdToEdit] = useState<number | null>(null);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch categories from API
   const fetchCategories = async () => {
@@ -51,6 +53,20 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
     fetchCategories();
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const toggleDropdown = () => setIsOpen(prev => !prev);
   const toggleCategoryModal = () => setIsCategoryModalOpen(prev => !prev);
 
@@ -59,36 +75,31 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
       ? [{ id: 0, name: 'All Categories', description: '' }, ...categories]
       : categories;
 
-  // Open modal to add a new category
   const handleAddCategory = () => {
     setCategoryIdToEdit(null);
     setIsOpen(false);
     setIsCategoryModalOpen(true);
   };
 
-  // Open modal to edit existing category
   const handleEditCategory = (category: ICategory) => {
     setCategoryIdToEdit(category.id ?? null);
     setIsOpen(false);
     setIsCategoryModalOpen(true);
   };
 
-  // Called after a category is created/updated
   const handleCategorySaved = (savedCategory: ICategory) => {
-    fetchCategories(); // refresh list
+    fetchCategories();
     if (savedCategory.id !== undefined && savedCategory.id !== null) {
-      setCategoryId(savedCategory.id); // notify parent safely
+      setCategoryId(savedCategory.id);
     }
-    onSaved?.(savedCategory); // callback for parent
+    onSaved?.(savedCategory);
   };
 
-  // Display label on button
   const getCategoryLabel = (catId: number | null) => {
     if (variant === 'list' && (catId === 0 || catId === null)) return 'All Categories';
     return categories.find(cat => cat.id === catId)?.name || 'Select a Category';
   };
 
-  // Handle user selecting a category from dropdown
   const handleSelectCategory = (id: number | undefined) => {
     const selectedId = id ?? 0;
     const newValue = variant === 'list' ? (selectedId !== 0 ? selectedId : null) : selectedId;
@@ -97,70 +108,67 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
   };
 
   const handleDeleteCategory = async (category: ICategory) => {
-      if (category.id === undefined || category.id === null) return;
+    if (!category.id) return;
 
-      const title = 'Confirm Delete :';
-      const text = `Are you sure you want to DELETE the following category?\n${JSON.stringify(category, null, 2)}`;
-      const confirmText = 'Delete';
-      const result = await Swal.fire({
-        title,
-        text,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: confirmText,
-        cancelButtonText: 'Cancel',
+    const result = await Swal.fire({
+      title: 'Confirm Delete:',
+      text: `Are you sure you want to DELETE this category?\n${JSON.stringify(category, null, 2)}`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+      background: '#1f2937',
+      color: '#f3f4f6',
+      customClass: {
+        confirmButton: 'px-4 py-2 bg-red-600 text-white rounded',
+        cancelButton: 'px-4 py-2 bg-blue-600 text-white rounded',
+      },
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const res = await deleteCategory(category.id);
+      const msg =
+        typeof res.data === 'string'
+          ? res.data
+          : res.data?.message ?? res.data?.error ?? '';
+      setMessage(msg);
+      await Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'info',
+        title: msg,
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
         background: '#1f2937',
         color: '#f3f4f6',
-        customClass: {
-          confirmButton: 'px-4 py-2 bg-red-600 text-white rounded',
-          cancelButton: 'px-4 py-2 bg-blue-600 text-white rounded',
-        },
       });
-      if(!result.isConfirmed) return;
-  
-      deleteCategory(category.id)
-      .then(async res => {
-        let msg = '';
-        if (typeof res.data === 'string') {
-          msg = res.data;
-        } else if (res.data && typeof res.data === 'object') {
-          msg = res.data.message ?? res.data.error ?? '';
-        }
 
-        setMessage(msg);
-        await Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'info',
-          title: msg,
-          showConfirmButton: false,
-          timer: 1500,
-          timerProgressBar: true,
-          background: '#1f2937',
-          color: '#f3f4f6',
-        });
-        fetchCategories();
-      })
-      .catch(async err => {
-        const msg = err.response?.data?.error ?? 'Unexpected error';
-        setMessage(msg);
-        await Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'error',
-          title: msg,
-          showConfirmButton: false,
-          timer: 2000,
-          background: '#1f2937',
-          color: '#f3f4f6',
-        });
+      if (categoryId === category.id) setCategoryId(null);
+      fetchCategories();
+    } catch (err: any) {
+      const msg = err.response?.data?.error ?? 'Unexpected error';
+      setMessage(msg);
+      await Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'error',
+        title: msg,
+        showConfirmButton: false,
+        timer: 2000,
+        background: '#1f2937',
+        color: '#f3f4f6',
       });
-    };
+    }
+  };
 
   return (
-    <div className="relative w-64">
+    <div className="relative w-64" ref={dropdownRef}>
       {/* Dropdown Button */}
       <button
+        type="button"
         onClick={toggleDropdown}
         className="w-full px-4 py-2 border border-gray-300 rounded flex justify-between items-center bg-white"
       >
@@ -190,8 +198,8 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
 
               {category.id !== 0 && (
                 <div className="flex gap-2">
-                  {/* Edit */}
                   <button
+                    type="button"
                     onClick={e => {
                       e.stopPropagation();
                       handleEditCategory(category);
@@ -201,12 +209,10 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
                     <PencilIcon className="h-5 w-5 text-yellow-500" />
                   </button>
 
-                  {/* Delete */}
                   <button
+                    type="button"
                     onClick={e => {
                       e.stopPropagation();
-                      // Reset selection if the deleted category was selected
-                      if (categoryId === category.id) setCategoryId(null);
                       handleDeleteCategory(category);
                     }}
                     title="Delete"
