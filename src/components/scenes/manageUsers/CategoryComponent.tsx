@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
-import { createCategory, updateCategory, getCategoryById } from '@/shared/services/CategoryService';
-import { ICategory } from '@/shared/types/interfaces/models/ICategory.type';
+import {
+  createCategory,
+  updateCategory,
+  getCategoryById,
+} from '@/shared/services/CategoryService';
+import { ICategory, IApiResponse } from '@/shared/types/interfaces';
 import Swal from 'sweetalert2';
 
 interface CategoryComponentProps {
@@ -50,26 +54,22 @@ const CategoryComponent: React.FC<CategoryComponentProps> = ({
         ? await updateCategory(categoryIdToEdit, category)
         : await createCategory(category);
 
-      const data = res.data;
-      let msg = '';
+      const apiResponse: IApiResponse<ICategory> = res.data;
+      const savedCategory = apiResponse.data;
+      const msg = apiResponse.message || 'Operation successful';
 
-      if (data && typeof data === 'object' && 'id' in data) {
-        msg = `Category ${categoryIdToEdit ? 'updated' : 'created'} successfully`;
+      if (savedCategory) {
         setMessage(msg);
-        onSaved?.(data as ICategory);
+        onSaved?.(savedCategory);
         toggle(); // close modal
-      } else if (typeof data === 'string') {
-        msg = data;
-        setMessage(msg);
-      } else if ('error' in (data as any)) {
-        msg = (data as any).error;
+      } else {
         setMessage(msg);
       }
 
       await Swal.fire({
         toast: true,
         position: 'top-end',
-        icon: 'info',
+        icon: savedCategory ? 'success' : 'info',
         title: msg,
         showConfirmButton: false,
         timer: 1500,
@@ -78,8 +78,9 @@ const CategoryComponent: React.FC<CategoryComponentProps> = ({
         color: '#f3f4f6',
       });
     } catch (err: any) {
-      const msg = err.response?.data ?? 'Unexpected error';
+      const msg = err.response?.data?.message ?? 'Unexpected error';
       setMessage(msg);
+
       await Swal.fire({
         toast: true,
         position: 'top-end',
@@ -94,20 +95,18 @@ const CategoryComponent: React.FC<CategoryComponentProps> = ({
   };
 
   useEffect(() => {
-    if (!isOpen) return; // only load when modal opens
+    if (!isOpen) return;
 
     if (categoryIdToEdit) {
       getCategoryById(categoryIdToEdit)
         .then((res) => {
-          const data = res.data;
-          if (data && typeof data === 'object' && 'name' in data) {
-            const category = data as ICategory;
+          const apiResponse: IApiResponse<ICategory | null> = res.data;
+          const category = apiResponse.data;
+          setMessage(apiResponse.message);
+
+          if (category) {
             setName(category.name);
             setDescription(category.description || '');
-          } else if (typeof data === 'string') {
-            setMessage(data);
-          } else if ('error' in (data as any)) {
-            setMessage((data as any).error);
           }
         })
         .catch(() => setMessage('Unexpected error occurred'));
@@ -122,7 +121,7 @@ const CategoryComponent: React.FC<CategoryComponentProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-      onKeyDown={(e) => e.stopPropagation()} // stop all key events from bubbling to parent
+      onKeyDown={(e) => e.stopPropagation()}
     >
       <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6">
         {/* Header */}

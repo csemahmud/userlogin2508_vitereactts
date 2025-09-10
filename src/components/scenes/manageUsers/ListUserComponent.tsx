@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteUser, getUserByEmail, listUsers, getUsersByCategoryId } from '@/shared/services/UserService';
-import { IUser } from '@/shared/types/interfaces/models/IUser.type';
-import { MagnifyingGlassIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid';
+import {
+  deleteUser,
+  getUserByEmail,
+  listUsers,
+  getUsersByCategoryId,
+} from '@/shared/services/UserService';
+import { IUser } from '@/shared/types/interfaces';
+import {
+  MagnifyingGlassIcon,
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+} from '@heroicons/react/24/solid';
 import CategoryDropdown from './CategoryDropdown';
 
 const ListUserComponent = () => {
@@ -11,6 +21,7 @@ const ListUserComponent = () => {
   const [users, setUsers] = useState<IUser[]>([]);
   const [categoryId, setCategoryId] = useState<number | null>(null); // null = All Categories
   const [errors, setErrors] = useState({ email: '' });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   // Fetch users whenever category changes
@@ -23,47 +34,75 @@ const ListUserComponent = () => {
   }, [categoryId]);
 
   const fetchUsers = () => {
+    setLoading(true);
     listUsers()
-      .then(res => setUsers(res.data || []))
-      .catch(err => console.error(err));
+      .then(res => {
+        setUsers(res.data.data || []);
+        setMessage(res.data.message ?? '');
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
   };
 
   const fetchUsersByCategory = (id: number) => {
+    setLoading(true);
     getUsersByCategoryId(id)
-      .then(res => setUsers(res.data || []))
-      .catch(err => console.error(err));
+      .then(res => {
+        setUsers(res.data.data || []);
+        setMessage(res.data.message ?? '');
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
   };
 
   const handleAddUser = () => navigate('/add-user');
 
   const handleEditUser = (user: IUser) => {
-    if (user.id !== undefined && user.id !== null) navigate(`/edit-user/${user.id}`);
+    if (user.id !== undefined && user.id !== null) {
+      navigate(`/edit-user/${user.id}`);
+    }
   };
 
   const handleDeleteUser = (user: IUser) => {
     if (user.id === undefined || user.id === null) return;
 
     const confirmed = confirm(
-      `Are you sure you want to DELETE the following user?\n${JSON.stringify(user, null, 2)}`
+      `Are you sure you want to DELETE the following user?\n${JSON.stringify(
+        user,
+        null,
+        2
+      )}`
     );
     if (!confirmed) return;
 
+    // helper (place near top of the component or in a shared util)
+    const extractAxiosErrorMessage = (err: any): string => {
+      return (
+        err?.response?.data?.message ??
+        err?.response?.data?.error ?? // sometimes backend returns { error: '...' }
+        err?.message ??
+        'Unexpected error'
+      );
+    };
+
+    // usage in handleDeleteUser
     deleteUser(user.id)
       .then(res => {
-        let msg = '';
-        if (typeof res.data === 'string') {
-          msg = res.data;
-        } else if (res.data && typeof res.data === 'object') {
-          msg = res.data.message ?? res.data.error ?? '';
-        }
+        // res.data is IApiResponse<IUser>
+        const successMsg = res.data?.message ?? '';
+        setMessage(successMsg);
 
-        setMessage(msg);
-        // refetch users for the current category
+        // refetch current view
         if (categoryId === null) fetchUsers();
         else fetchUsersByCategory(categoryId);
+
         setEmail('');
       })
-      .catch(err => console.error(err));
+      .catch(err => {
+        const msg = extractAxiosErrorMessage(err);
+        console.error('Delete failed:', err);
+        setMessage(msg);
+      });
   };
 
   const validateEmail = (): boolean => {
@@ -91,18 +130,20 @@ const ListUserComponent = () => {
   const handleSearchByEmail = () => {
     if (!validateEmail()) return;
 
+    setLoading(true);
     getUserByEmail(email.trim())
       .then(res => {
-        const data = res.data;
-        if (data && typeof data === 'object' && 'name' in data) {
-          setUsers([data as IUser]);
+        const response = res.data;
+        if (response.data) {
+          setUsers([response.data]);
           setMessage('');
         } else {
           setUsers([]);
-          setMessage(typeof data === 'string' ? data : 'No user found.');
+          setMessage(response.message ?? 'No user found.');
         }
       })
-      .catch(err => console.error(err));
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -131,9 +172,7 @@ const ListUserComponent = () => {
           setCategoryId={setCategoryId}
           setMessage={setMessage}
           variant="list"
-          onSaved={() => {
-            // no need to fetch users here, categoryId effect handles it
-          }}
+          onSaved={() => {}}
         />
       </div>
 
@@ -165,32 +204,49 @@ const ListUserComponent = () => {
           </tr>
         </thead>
         <tbody>
-          {users.map((user, index) => (
-            <tr key={user.id ?? index} className="hover:bg-gray-100">
-              <td className="border border-gray-300 px-2 py-1">{index}</td>
-              <td className="border border-gray-300 px-2 py-1">{user.id}</td>
-              <td className="border border-gray-300 px-2 py-1">{user.name}</td>
-              <td className="border border-gray-300 px-2 py-1">{user.email}</td>
-              <td className="border border-gray-300 px-2 py-1">{user.domain}</td>
-              <td className="border border-gray-300 px-2 py-1">{user.age}</td>
-              <td className="border border-gray-300 px-2 py-1">{user.experience}</td>
-              <td className="border border-gray-300 px-2 py-1">{user.salary}</td>
-              <td className="border border-gray-300 px-2 py-1 flex gap-2">
-                <button
-                  className="bg-blue-500 text-white px-2 py-1 rounded"
-                  onClick={() => handleEditUser(user)}
-                >
-                  <PencilIcon className="h-6 w-6 text-yellow-500" />
-                </button>
-                <button
-                  className="bg-red-500 text-white px-2 py-1 rounded"
-                  onClick={() => handleDeleteUser(user)}
-                >
-                  <TrashIcon className="h-6 w-6 text-cyan-500" />
-                </button>
+          {loading ? (
+            <tr>
+              <td colSpan={9} className="text-center py-4">
+                <div className="flex justify-center items-center gap-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                  <span>Loading...</span>
+                </div>
               </td>
             </tr>
-          ))}
+          ) : users.length === 0 ? (
+            <tr>
+              <td colSpan={9} className="text-center py-4 text-gray-500">
+                No users found.
+              </td>
+            </tr>
+          ) : (
+            users.map((user, index) => (
+              <tr key={user.id ?? index} className="hover:bg-gray-100">
+                <td className="border border-gray-300 px-2 py-1">{index}</td>
+                <td className="border border-gray-300 px-2 py-1">{user.id}</td>
+                <td className="border border-gray-300 px-2 py-1">{user.name}</td>
+                <td className="border border-gray-300 px-2 py-1">{user.email}</td>
+                <td className="border border-gray-300 px-2 py-1">{user.domain}</td>
+                <td className="border border-gray-300 px-2 py-1">{user.age}</td>
+                <td className="border border-gray-300 px-2 py-1">{user.experience}</td>
+                <td className="border border-gray-300 px-2 py-1">{user.salary}</td>
+                <td className="border border-gray-300 px-2 py-1 flex gap-2">
+                  <button
+                    className="bg-blue-500 text-white px-2 py-1 rounded"
+                    onClick={() => handleEditUser(user)}
+                  >
+                    <PencilIcon className="h-6 w-6 text-yellow-500" />
+                  </button>
+                  <button
+                    className="bg-red-500 text-white px-2 py-1 rounded"
+                    onClick={() => handleDeleteUser(user)}
+                  >
+                    <TrashIcon className="h-6 w-6 text-cyan-500" />
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

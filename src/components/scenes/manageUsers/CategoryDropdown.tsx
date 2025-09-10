@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ICategory } from '@/shared/types/interfaces/models/ICategory.type';
+import { ICategory, IApiResponse } from '@/shared/types/interfaces';
 import { deleteCategory, listCategories } from '@/shared/services/CategoryService';
 import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/solid';
 import CategoryComponent from './CategoryComponent';
@@ -27,21 +27,18 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch categories from API
+  // ------------------ Fetch Categories ------------------
   const fetchCategories = async () => {
     try {
       const response = await listCategories();
-      const data = response.data;
+      const apiResponse: IApiResponse<ICategory[]> = response.data;
 
-      if (Array.isArray(data) && data.length > 0 && 'name' in data[0]) {
-        setCategories(data as ICategory[]);
-        setMessage('');
-      } else if (typeof data === 'string') {
-        setCategories([]);
-        setMessage(data);
+      if (apiResponse.data) {
+        setCategories(apiResponse.data);
       } else {
         setCategories([]);
       }
+      setMessage(apiResponse.message || '');
     } catch (error) {
       console.error('Failed to fetch categories:', error);
       setMessage('Failed to fetch categories');
@@ -53,20 +50,18 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
     fetchCategories();
   }, []);
 
-  // Close dropdown when clicking outside
+  // ------------------ Handle Outside Click ------------------
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ------------------ UI Handlers ------------------
   const toggleDropdown = () => setIsOpen(prev => !prev);
   const toggleCategoryModal = () => setIsCategoryModalOpen(prev => !prev);
 
@@ -107,6 +102,7 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
     setIsOpen(false);
   };
 
+  // ------------------ Delete Category ------------------
   const handleDeleteCategory = async (category: ICategory) => {
     if (!category.id) return;
 
@@ -129,16 +125,15 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
 
     try {
       const res = await deleteCategory(category.id);
-      const msg =
-        typeof res.data === 'string'
-          ? res.data
-          : res.data?.message ?? res.data?.error ?? '';
-      setMessage(msg);
+      const { message } = res.data;
+
+      setMessage(message);
+
       await Swal.fire({
         toast: true,
         position: 'top-end',
-        icon: 'info',
-        title: msg,
+        icon: 'success',
+        title: message,
         showConfirmButton: false,
         timer: 1500,
         timerProgressBar: true,
@@ -149,7 +144,7 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
       if (categoryId === category.id) setCategoryId(null);
       fetchCategories();
     } catch (err: any) {
-      const msg = err.response?.data?.error ?? 'Unexpected error';
+      const msg = err.response?.data?.message ?? 'Unexpected error';
       setMessage(msg);
       await Swal.fire({
         toast: true,
@@ -164,6 +159,7 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
     }
   };
 
+  // ------------------ Render ------------------
   return (
     <div className="relative w-64" ref={dropdownRef}>
       {/* Dropdown Button */}
@@ -190,7 +186,9 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
             <div
               key={category.id}
               className={`flex justify-between items-center px-4 py-2 cursor-pointer hover:bg-gray-100 ${
-                variant === 'list' && category.id === (categoryId ?? 0) ? 'bg-blue-100 font-semibold' : ''
+                variant === 'list' && category.id === (categoryId ?? 0)
+                  ? 'bg-blue-100 font-semibold'
+                  : ''
               }`}
               onClick={() => handleSelectCategory(category.id)}
             >
