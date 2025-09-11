@@ -11,6 +11,7 @@ interface CategoryDropdownProps {
   setMessage?: (msg: string) => void;
   variant?: 'default' | 'list';
   onSaved?: (category: ICategory) => void;
+  onCategoryChange?: (id: number | null) => void; // <-- new
 }
 
 const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
@@ -19,6 +20,7 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
   setMessage = console.log,
   variant = 'default',
   onSaved,
+  onCategoryChange,   // ✅ add this
 }) => {
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -98,7 +100,9 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({
   const handleSelectCategory = (id: number | undefined) => {
     const selectedId = id ?? 0;
     const newValue = variant === 'list' ? (selectedId !== 0 ? selectedId : null) : selectedId;
-    setCategoryId(newValue);
+
+    setCategoryId(newValue);           // updates internal state
+    onCategoryChange?.(newValue);      // notify parent (reset email + fetch)
     setIsOpen(false);
   };
 

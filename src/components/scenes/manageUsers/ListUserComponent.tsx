@@ -14,24 +14,21 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/solid';
 import CategoryDropdown from './CategoryDropdown';
+import Swal from 'sweetalert2';
 
 const ListUserComponent = () => {
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
   const [users, setUsers] = useState<IUser[]>([]);
-  const [categoryId, setCategoryId] = useState<number | null>(null); // null = All Categories
+  const [categoryId, setCategoryId] = useState<number | null>(null);
   const [errors, setErrors] = useState({ email: '' });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch users whenever category changes
+  // Fetch users initially (all users)
   useEffect(() => {
-    if (categoryId === null) {
-      fetchUsers();
-    } else {
-      fetchUsersByCategory(categoryId);
-    }
-  }, [categoryId]);
+    fetchUsers();
+  }, []);
 
   const fetchUsers = () => {
     setLoading(true);
@@ -63,40 +60,59 @@ const ListUserComponent = () => {
     }
   };
 
-  const handleDeleteUser = (user: IUser) => {
+  const handleDeleteUser = async (user: IUser) => {
     if (user.id === undefined || user.id === null) return;
 
-    const confirmed = confirm(
-      `Are you sure you want to DELETE the following user?\n${JSON.stringify(
+    const result = await Swal.fire({
+      title: 'Confirm Delete:',
+      text: `Are you sure you want to DELETE the following user?\n${JSON.stringify(
         user,
         null,
         2
-      )}`
-    );
-    if (!confirmed) return;
+      )}`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+      background: '#1f2937',
+      color: '#f3f4f6',
+      customClass: {
+        confirmButton: 'px-4 py-2 bg-red-600 text-white rounded',
+        cancelButton: 'px-4 py-2 bg-blue-600 text-white rounded',
+      },
+    });
+    if (!result.isConfirmed) return;
 
-    // helper (place near top of the component or in a shared util)
     const extractAxiosErrorMessage = (err: any): string => {
       return (
         err?.response?.data?.message ??
-        err?.response?.data?.error ?? // sometimes backend returns { error: '...' }
+        err?.response?.data?.error ??
         err?.message ??
         'Unexpected error'
       );
     };
 
-    // usage in handleDeleteUser
     deleteUser(user.id)
-      .then(res => {
-        // res.data is IApiResponse<IUser>
+      .then(async res => {
         const successMsg = res.data?.message ?? '';
         setMessage(successMsg);
 
-        // refetch current view
-        if (categoryId === null) fetchUsers();
-        else fetchUsersByCategory(categoryId);
+        await Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: successMsg,
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+          background: '#1f2937',
+          color: '#f3f4f6',
+        });
 
-        setEmail('');
+        // Refetch according to context
+        if (categoryId !== null) fetchUsersByCategory(categoryId);
+        else if (email) handleSearchByEmail();
+        else fetchUsers();
       })
       .catch(err => {
         const msg = extractAxiosErrorMessage(err);
@@ -130,6 +146,9 @@ const ListUserComponent = () => {
   const handleSearchByEmail = () => {
     if (!validateEmail()) return;
 
+    // Reset category filter
+    setCategoryId(null);
+
     setLoading(true);
     getUserByEmail(email.trim())
       .then(res => {
@@ -144,6 +163,15 @@ const ListUserComponent = () => {
       })
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  const handleCategoryChange = (id: number | null) => {
+    // Reset email filter
+    setEmail('');
+    setCategoryId(id);
+
+    if (id === null) fetchUsers();
+    else fetchUsersByCategory(id);
   };
 
   return (
@@ -169,7 +197,8 @@ const ListUserComponent = () => {
 
         <CategoryDropdown
           categoryId={categoryId}
-          setCategoryId={setCategoryId}
+          setCategoryId={setCategoryId}  // keep real setter
+          onCategoryChange={handleCategoryChange} // custom logic
           setMessage={setMessage}
           variant="list"
           onSaved={() => {}}

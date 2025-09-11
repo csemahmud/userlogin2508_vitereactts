@@ -63,8 +63,6 @@ const NumberInput = ({
 // -----------------------------
 // Main Component
 // -----------------------------
-// ... (imports remain the same)
-
 const UserComponent = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -92,22 +90,54 @@ const UserComponent = () => {
     category: '',
   });
   const [loading, setLoading] = useState(false);
+  const [passwordMatch, setPasswordMatch] = useState(false);
 
   // -----------------------------
-  // Real-time Confirm Password Validation
+  // Load User Data
+  // -----------------------------
+  useEffect(() => {
+    if (!id) return;
+
+    setLoading(true);
+    getUserById(Number(id))
+      .then(res => {
+        const user = res.data.data;
+        if (user) {
+          setName(user.name);
+          setEmail(user.email);
+          setDomain(user.domain || '');
+          setAge(user.age);
+          setExperience(user.experience);
+          setSalary(user.salary);
+          setCategoryId(user.categoryId ?? null);
+          setImagePath(user.imagePath || '');
+          setImageName(user.imageName || '');
+        } else {
+          setMessage(res.data.message ?? 'User not found');
+        }
+      })
+      .catch(() => setMessage('Unexpected error occurred'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // -----------------------------
+  // Real-time Password Validation
   // -----------------------------
   useEffect(() => {
     if (!confirmPassword) {
       setErrors(prev => ({ ...prev, confirmPassword: '' }));
+      setPasswordMatch(false);
     } else if (rawPassword !== confirmPassword) {
       setErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match.' }));
+      setPasswordMatch(false);
     } else {
       setErrors(prev => ({ ...prev, confirmPassword: '' }));
+      setPasswordMatch(true);
     }
   }, [rawPassword, confirmPassword]);
 
   // -----------------------------
-  // Form Validation (on submit)
+  // Form Validation
   // -----------------------------
   const validateForm = (): boolean => {
     const newErrors = { ...errors };
@@ -126,17 +156,19 @@ const UserComponent = () => {
       valid = false;
     } else newErrors.email = '';
 
-    if (!rawPassword.trim()) {
-      newErrors.rawPassword = 'Password is required.';
-      valid = false;
-    } else newErrors.rawPassword = '';
+    if (id === undefined) {
+      if (!rawPassword.trim()) {
+        newErrors.rawPassword = 'Password is required.';
+        valid = false;
+      } else newErrors.rawPassword = '';
 
-    if (!confirmPassword.trim()) {
-      newErrors.confirmPassword = 'Please confirm your password.';
-      valid = false;
-    } else if (rawPassword !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match.';
-      valid = false;
+      if (!confirmPassword.trim()) {
+        newErrors.confirmPassword = 'Please confirm your password.';
+        valid = false;
+      } else if (!passwordMatch) {
+        newErrors.confirmPassword = 'Passwords do not match.';
+        valid = false;
+      }
     }
 
     if (!categoryId || categoryId <= 0) {
@@ -149,34 +181,7 @@ const UserComponent = () => {
   };
 
   // -----------------------------
-  // Load User Data (same as before)
-  // -----------------------------
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    getUserById(Number(id))
-      .then(res => {
-        const user = res.data.data;
-        if (user) {
-          setName(user.name);
-          setEmail(user.email);
-          setDomain(user.domain || '');
-          setAge(user.age);
-          setExperience(user.experience);
-          setSalary(user.salary);
-          setCategoryId(user.category?.id ?? null);
-          setImagePath(user.imagePath || '');
-          setImageName(user.imageName || '');
-        } else {
-          setMessage(res.data.message ?? 'User not found');
-        }
-      })
-      .catch(() => setMessage('Unexpected error occurred'))
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  // -----------------------------
-  // Submit Handler (same as before)
+  // Submit Handler
   // -----------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,6 +219,29 @@ const UserComponent = () => {
         background: '#1f2937',
         color: '#f3f4f6',
       });
+
+      // Reset form if creating a new user
+      if (!id) {
+        setName('');
+        setEmail('');
+        setRawPassword('');
+        setConfirmPassword('');
+        setDomain('');
+        setAge(undefined);
+        setExperience(undefined);
+        setSalary(undefined);
+        setCategoryId(null);
+        setImagePath('');
+        setImageName('');
+        setErrors({
+          name: '',
+          email: '',
+          rawPassword: '',
+          confirmPassword: '',
+          category: '',
+        });
+        setPasswordMatch(false);
+      }
     } catch (err: any) {
       const msg = err.response?.data?.message ?? 'Unexpected error occurred';
       setMessage(msg);
@@ -239,25 +267,7 @@ const UserComponent = () => {
   const getOperation = () => (id ? 'Update' : 'Register');
 
   // -----------------------------
-  // Real-time Confirm Password Validation
-  // -----------------------------
-  const [passwordMatch, setPasswordMatch] = useState(false);
-
-  useEffect(() => {
-    if (!confirmPassword) {
-      setErrors(prev => ({ ...prev, confirmPassword: '' }));
-      setPasswordMatch(false);
-    } else if (rawPassword !== confirmPassword) {
-      setErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match.' }));
-      setPasswordMatch(false);
-    } else {
-      setErrors(prev => ({ ...prev, confirmPassword: '' }));
-      setPasswordMatch(true);
-    }
-  }, [rawPassword, confirmPassword]);
-
-  // -----------------------------
-  // Render (same as before)
+  // Render
   // -----------------------------
   return (
     <div className="p-6">
@@ -270,34 +280,38 @@ const UserComponent = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <TextInput label="Name" value={name} setter={setName} error={errors.name} />
             <TextInput label="Email" value={email} setter={setEmail} type="email" error={errors.email} />
-            <TextInput
-              label="Password"
-              value={rawPassword}
-              setter={setRawPassword}
-              type="password"
-              error={errors.rawPassword}
-              placeholder="Enter Password"
-            />
-            <div>
-              <TextInput
-                label="Confirm Password"
-                value={confirmPassword}
-                setter={setConfirmPassword}
-                type="password"
-                error={errors.confirmPassword}
-                placeholder="Confirm Password"
-              />
-              {passwordMatch && (
-                <p className="text-green-500 text-sm mt-1">Password has matched</p>
-              )}
-            </div>
-            
+
+            {/* Password fields only for new user */}
+            {id === undefined && (
+              <>
+                <TextInput
+                  label="Password"
+                  value={rawPassword}
+                  setter={setRawPassword}
+                  type="password"
+                  error={errors.rawPassword}
+                  placeholder="Enter Password"
+                />
+                <div>
+                  <TextInput
+                    label="Confirm Password"
+                    value={confirmPassword}
+                    setter={setConfirmPassword}
+                    type="password"
+                    error={errors.confirmPassword}
+                    placeholder="Confirm Password"
+                  />
+                  {passwordMatch && <p className="text-green-500 text-sm mt-1">Password has matched</p>}
+                </div>
+              </>
+            )}
+
             {/* Category */}
             <div>
               <label className="block text-gray-700 font-medium">Category:</label>
               <CategoryDropdown
-                categoryId={categoryId}
-                setCategoryId={setCategoryId as React.Dispatch<React.SetStateAction<number | null>>}
+                categoryId={categoryId ?? 0}
+                setCategoryId={setCategoryId}
                 setMessage={setMessage}
                 onSaved={newCategory => {
                   if (newCategory.id) setCategoryId(newCategory.id);
