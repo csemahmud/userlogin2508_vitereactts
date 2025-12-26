@@ -1,6 +1,6 @@
 import { SelectedPage } from "@/shared/types/enums/SelectedPage.type";
 import { motion } from "framer-motion";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import ListUserComponent from "./ListUserComponent";
 import UserComponent from "./UserComponent";
 
@@ -15,7 +15,7 @@ type Props = {
       <motion.div
         onViewportEnter={() => setSelectedPage(SelectedPage.ManageUsers)}
       >
-        <BrowserRouter>
+        
             <div className="overflow-x-auto overflow-y-hidden p-6 bg-gray-100 min-h-screen">
                 <h1 className="text-3xl font-bold text-center text-blue-700 mb-8">Manage Users</h1>
                 <Routes>
@@ -32,7 +32,7 @@ type Props = {
                     <Route path="/edit-user/:id" element={<UserComponent />} />
                 </Routes>
             </div>
-        </BrowserRouter>
+        
      </motion.div>
     </section>
   )

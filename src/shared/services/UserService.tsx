@@ -1,9 +1,20 @@
 // java/spring_boot/userlogin2508_vitereactts/src/shared/services/UserService.ts
 
 import axios, { AxiosResponse } from 'axios';
-import { IUser, IApiResponse } from '@/shared/types/interfaces';
+import { IUser, IApiResponse, ILoginRequest, ILoginResponse } from '@/shared/types/interfaces';
 
 const REST_API_BASE_URL = 'http://localhost:9191/api/users';
+
+// ------------------ LOGIN ------------------
+
+// Login user (POST with JSON body)
+export const loginUser = (
+  loginData: ILoginRequest
+): Promise<AxiosResponse<IApiResponse<ILoginResponse>>> =>
+  axios.post<IApiResponse<ILoginResponse>>(
+    `${REST_API_BASE_URL}/login`,
+    loginData
+  );
 
 // ------------------ LIST / READ ------------------
 

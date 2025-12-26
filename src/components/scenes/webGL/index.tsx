@@ -1,6 +1,6 @@
 import { SelectedPage } from '@/shared/types/enums/SelectedPage.type';
 import { motion } from 'framer-motion';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route, Link } from 'react-router-dom';
 import AboutWebGL from './pages/AboutWebGL';
 import WebGLHome from './pages/WebGLHome';
 import NotFound from './pages/NotFound';
@@ -17,7 +17,7 @@ const WebGL = ({ setSelectedPage }: Props) => {
       <motion.div
         onViewportEnter={() => setSelectedPage(SelectedPage.WebGL)}
       >
-        <BrowserRouter>
+        
             <div className="overflow-x-scroll overflow-y-hidden p-6 bg-gray-100 min-h-screen">
                 <h1 className="text-3xl font-bold text-center text-blue-700 mb-8">WebGL Demo</h1>
                 <div className=" bg-gray-20">
@@ -36,7 +36,7 @@ const WebGL = ({ setSelectedPage }: Props) => {
                   </Routes>
               </div>
             </div>
-        </BrowserRouter>
+        
      </motion.div>
     </section>
   )
